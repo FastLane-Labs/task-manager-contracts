@@ -35,4 +35,6 @@ interface IAddressHub {
     function updatePointerAddress(uint256 pointer, address newAddress) external;
 
     function addPointerAddress(uint256 pointer, address newAddress, string calldata newLabel) external;
+
+    function addOwner(address newOwner) external;
 }
