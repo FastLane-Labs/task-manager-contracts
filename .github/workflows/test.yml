@@ -1,9 +1,10 @@
 name: CI
 
 on:
-  push:
   pull_request:
-  workflow_dispatch:
+  push:
+    branches:
+      - "main"
 
 env:
   FOUNDRY_PROFILE: ci
@@ -21,7 +22,7 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@v1.2.0
 
       - name: Show Forge version
         run: |
@@ -41,3 +42,5 @@ jobs:
         run: |
           forge test -vvv
         id: test
+        env:
+          MONAD_TESTNET_RPC_URL: ${{ secrets.MONAD_TESTNET_RPC_URL }}

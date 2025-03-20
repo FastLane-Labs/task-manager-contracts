@@ -3,7 +3,7 @@ cache/
 out/
 
 # Ignores development broadcast logs
-!/broadcast
+/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 
@@ -12,3 +12,14 @@ docs/
 
 # Dotenv file
 .env
+
+# Cursor rules and settings
+.cursorrules
+.cursor
+# Private individual user cursor rules
+.cursor/rules/_*.mdc
+
+# All the homies hate .DS_Store
+.DS_Store
+
+snapshots/
