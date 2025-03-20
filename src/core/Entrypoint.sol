@@ -231,6 +231,11 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
         withLock
         returns (uint256 feesEarned)
     {
+        // Validate payout address is not zero
+        if (payoutAddress == address(0)) {
+            revert InvalidPayoutAddress();
+        }
+
         // Loop through available tasks
         return _execute(payoutAddress, targetGasReserve);
     }
