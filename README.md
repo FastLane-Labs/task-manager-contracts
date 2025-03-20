@@ -16,7 +16,7 @@ The system allows users to schedule smart contract tasks that will be executed i
   Schedule tasks using either native MON (by sending native value along with the call) or bonded shMONAD.
 
 - **Execution Isolation:**  
-  Each task is executed in a dedicated execution environment deployed via `CREATE2`. These environments will `DELEGATECALL` an `IMPLEMENTATION` smart contract supplied by the task creator. Two example `IMPLEMENTATION` smart contracts are available in the repository:
+  Each task is executed in a dedicated execution environment deployed via `CREATE2`. These environments will `DELEGATECALL` an `IMPLEMENTATION` smart contract with a predefined `CALLDATA` and gas limit. The `IMPLEMENTATION` address, the `CALLDATA` arguments, and the gas limit are all supplied by the task creator at the time of scheduling. Two example `IMPLEMENTATION` smart contracts are available in the repository:
   - **BasicTaskEnvironment:** For simple execution with pre-execution validation and logging.
   - **ReschedulingTaskEnvironment:** Extends basic functionality with automatic retry logic and rescheduling on failure.
   
