@@ -73,19 +73,53 @@ Core system components:
 
 ```solidity
 interface ITaskManager {
-    // Task Management
-    function scheduleTask(Task calldata task, uint64 targetBlock) external returns (bytes32 taskId);
-    function scheduleTaskWithQuote(Task calldata task, uint64 targetBlock, uint256 maxPayment) 
-        external returns (bool scheduled, uint256 executionCost, bytes32 taskId);
+    // Scheduling Tasks with Native MON
+    function scheduleTask(
+        address implementation,
+        uint256 taskGasLimit,
+        uint64 targetBlock,
+        uint256 maxPayment,
+        bytes calldata taskCallData
+    )
+        external
+        payable
+        returns (bool scheduled, uint256 executionCost, bytes32 taskId);
+    
+    // Scheduling Tasks with Bonded shMONAD
+    function scheduleWithBond(
+        address implementation,
+        uint256 taskGasLimit,
+        uint64 targetBlock,
+        uint256 maxPayment,
+        bytes calldata taskCallData
+    )
+        external
+        returns (bool scheduled, uint256 executionCost, bytes32 taskId);
+    
+    // Rescheduling an Active Task
+    function rescheduleTask(
+        uint64 targetBlock,
+        uint256 maxPayment
+    )
+        external
+        payable
+        returns (bool rescheduled, uint256 executionCost, bytes32 taskId);
+    
+    // Cancelling a Task
     function cancelTask(bytes32 taskId) external;
     
-    // Task Execution
-    function executeQueuedTasks(address payoutAddress, uint256 targetGasReserve) 
-        external returns (uint256 feesEarned, bool success);
+    // Executing Tasks
+    function executeTasks(address payoutAddress, uint256 targetGasReserve) 
+        external returns (uint256 feesEarned);
     
     // Task Information
     function getAccountNonce(address account) external view returns (uint64);
-    function estimateRequiredBond(Task calldata task, uint64 targetBlock) external view returns (uint256);
+    function estimateRequiredBond(
+        address implementation,
+        uint256 taskGasLimit,
+        uint64 targetBlock,
+        bytes calldata taskCallData
+    ) external view returns (uint256);
     function getTaskMetadata(bytes32 taskId) external view returns (TaskMetadata memory);
     function getNextExecutionBlockInRange(uint64 startBlock, uint64 endBlock) external view returns (uint64);
 }
@@ -93,16 +127,13 @@ interface ITaskManager {
 
 ## Task Structure
 
-```solidity
-struct Task {
-    address from;      // Task owner
-    uint64 nonce;      // Account nonce
-    Size size;         // Task size category
-    bool cancelled;    // Cancellation status
-    address target;    // Target contract
-    bytes data;        // Execution data
-}
+Tasks are represented by a packed bytes32 identifier that contains:
+- Execution Environment Address: The deployed environment for the task
+- Scheduled Block Number & Index: To track the task's place in the queue
+- Task Size: Indicates gas requirements (Small, Medium, Large)
+- Cancellation Status: A flag to mark if the task has been cancelled
 
+```solidity
 enum Size {
     Small,   // <= 100,000 gas
     Medium,  // <= 250,000 gas
@@ -118,16 +149,27 @@ struct TaskMetadata {
 
 ## Economic Security
 
-The system uses shMONAD for economic security:
-- Tasks require bonded shMONAD for execution
-- Bond amounts are calculated dynamically based on:
-  - Historical execution costs
-  - Task size category
-  - Block distance
-  - Network congestion
-- Fees are distributed between:
-  - Executors (95%)
-  - Protocol (5%)
+The system supports two payment mechanisms for task execution:
+
+1. **One-time Tasks with MON:**
+   - Users can pay directly with native MON tokens
+   - Payment is sent along with the `scheduleTask` function call
+   - Suitable for simple, non-recurring tasks
+   - No bonding/staking required
+
+2. **Repeatable Tasks with shMONAD:**
+   - Uses bonded shMONAD (staked MONAD) for economic security
+   - Required for tasks that may need to be rescheduled or are part of a recurring system
+   - Bond amounts are calculated dynamically based on:
+     - Historical execution costs
+     - Task size category
+     - Block distance
+     - Network congestion
+
+For both payment methods, fees are distributed between:
+- Protocol: 25%
+- Validator (block.coinbase): 26%
+- Executor: 49%
 
 ## Load Balancing
 
@@ -135,7 +177,7 @@ The system implements a sophisticated load balancing mechanism:
 - Multi-depth tracking system (B, C, D trackers)
 - Dynamic fee adjustment based on historical data
 - Block-based task distribution
-- Bayesian prior updates for low demand periods
+- Bitmap-based block skipping
 - Congestion-aware scheduling
 
 ## Load Balancer Workflow
@@ -337,24 +379,29 @@ event ProtocolFeeCollected(uint256 amount);
 ## Usage Example
 
 ```solidity
-// Create a task
-Task memory task = Task({
-    from: msg.sender,
-    nonce: taskManager.getAccountNonce(msg.sender),
-    size: Size.Small,
-    cancelled: false,
-    target: targetContract,
-    data: encodedCalldata
-});
+// Schedule a task using native MON
+(bool scheduled, uint256 executionCost, bytes32 taskId) = taskManager.scheduleTask(
+    targetContract,      // Implementation address (target of delegatecall)
+    100_000,             // Task gas limit (must be ≤ LARGE_GAS)
+    block.number + 10,   // Target block for execution (must be in the future)
+    maxPayment,          // Maximum payment willing to pay
+    encodedCalldata      // Encoded function call data
+);
 
-// Get required bond
-uint256 requiredBond = taskManager.estimateRequiredBond(task, targetBlock);
+// Schedule a task with bonded shMONAD
+(bool scheduled, uint256 executionCost, bytes32 taskId) = taskManager.scheduleWithBond(
+    targetContract,      // Implementation address
+    100_000,             // Task gas limit
+    block.number + 10,   // Target block
+    maxPayment,          // Maximum payment
+    encodedCalldata      // Call data
+);
 
-// Bond shMONAD
-shMonad.bond(taskManager.POLICY_ID(), requiredBond);
-
-// Schedule task
-bytes32 taskId = taskManager.scheduleTask(task, targetBlock);
+// To reschedule an active task (from within the execution environment)
+(bool rescheduled, uint256 executionCost, bytes32 newTaskId) = taskManager.rescheduleTask(
+    block.number + 5,    // New target block
+    maxPayment           // Updated max payment if needed
+);
 ```
 
 ## Security Model
@@ -389,10 +436,10 @@ bytes32 taskId = taskManager.scheduleTask(task, targetBlock);
 
 2. **TaskAccountingMath**
    - Fee calculation helpers
-   - Protocol fee constants
+   - Protocol fee constants (25% protocol, 26% validator, 49% executor)
    - Weighted average computation
 
 3. **Types and Errors**
    - Shared data structures
    - Custom error definitions
-   - Event declarations
+   - Event declarations 
