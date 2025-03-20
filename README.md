@@ -19,6 +19,7 @@ The system allows users to schedule smart contract tasks that will be executed i
   Each task is executed in a dedicated execution environment deployed via `CREATE2`. These environments will `DELEGATECALL` an `IMPLEMENTATION` smart contract supplied by the task creator. Two example `IMPLEMENTATION` smart contracts are available in the repository:
   - **BasicTaskEnvironment:** For simple execution with pre-execution validation and logging.
   - **ReschedulingTaskEnvironment:** Extends basic functionality with automatic retry logic and rescheduling on failure.
+  
   Additional `IMPLEMENTATION` examples will be added as development continues. 
 
 - **Dynamic Fee Calculation:**  
