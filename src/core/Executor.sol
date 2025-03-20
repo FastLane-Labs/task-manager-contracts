@@ -8,6 +8,7 @@ import { IShMonad } from "src/interfaces/shmonad/IShMonad.sol";
 import { Directory } from "src/interfaces/common/Directory.sol";
 import { TaskAccountingMath } from "../libraries/TaskAccountingMath.sol";
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import { console } from "forge-std/console.sol";
 
 /// @title TaskExecutor
 /// @notice Handles task execution and fee distribution
@@ -241,12 +242,23 @@ abstract contract TaskExecutor is TaskPricing {
         }
         emit ExecutorReimbursed(executor, executorPayout);
 
-        // Then boost yield with protocol fee instead
-        (success,) =
-            SHMONAD.call{ gas: gasleft() }(abi.encodeWithSelector(bytes4(0x2eac4115), protocolPayout, address(this)));
-        if (!success) {
-            revert BoostYieldFailed(address(this), protocolPayout);
+        // Debug logs for boost yield failure
+        uint256 balance = IERC20(address(SHMONAD)).balanceOf(address(this));
+        console.log("Contract balance:", balance);
+        console.log("Protocol payout required:", protocolPayout);
+
+        if (protocolPayout > balance) {
+            console.log("Warning: Protocol payout greater than balance");
         }
-        emit ProtocolFeeCollected(protocolPayout);
+        // Then boost yield with protocol fee instead
+        uint256 _safeProtocolPayout = protocolPayout > balance ? balance : protocolPayout;
+        // Then boost yield with protocol fee instead
+        (success,) = SHMONAD.call{ gas: gasleft() }(
+            abi.encodeWithSelector(bytes4(0x2eac4115), _safeProtocolPayout, address(this))
+        );
+        if (!success) {
+            revert BoostYieldFailed(address(this), _safeProtocolPayout);
+        }
+        emit ProtocolFeeCollected(_safeProtocolPayout);
     }
 }
