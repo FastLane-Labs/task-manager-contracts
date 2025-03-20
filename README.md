@@ -8,7 +8,7 @@ The system allows users to schedule smart contract tasks that will be executed i
 
 ## Key Features 
 - **Designed for Monad:**  
-  In the context of both block building and transaction pricing, Monad's asynchronous execution induces validators and users to evaluate a transaction's gas limit rather than its gas usage. This is because in asynchronous environments, a transaction's gas usage is not known until after a transaction has been executed, which occurs after it is included in a block that has been proposed and validated. The Task Manager is intended to use the "unused but paid-for" gas that resulting from this system.
+  In the context of both block building and transaction pricing, Monad's asynchronous execution induces validators and users to evaluate a transaction's gas limit rather than its gas usage. This is because in asynchronous environments, a transaction's gas usage is not known until after a transaction has been executed, which occurs after it is included in a block that has been proposed and validated. The Task Manager is intended to use the "unused but paid-for" gas that results from this system.
 
   While the primary supplier of gas used in the execution of tasks will most likely be failed searcher transactions calling the `FastLane MEV EntryPoint` smart contract, any app or smart contract in the monad ecosystem can offer their users gas rebates by allocating any unused gas at the end of the transaction to the task manager.
 
