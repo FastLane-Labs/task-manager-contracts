@@ -1,6 +1,6 @@
 # Task Manager
 
-Task Manager is a smart contract–based task scheduling and execution system designed for the Monad blockchain. It leverages shMONAD bonding for economic security and uses advanced load balancing and dynamic fee pricing to schedule tasks with predictable gas usage.
+Task Manager is a smart contract–based task scheduling and execution system designed for the Monad blockchain. It leverages shMONAD (staked MON) bonding for economic security and uses advanced load balancing and dynamic fee pricing to schedule tasks with predictable gas usage.
 
 ## Overview
 
@@ -9,7 +9,7 @@ The system allows users to schedule smart contract tasks that will be executed i
 ## Key Features
 
 - **Flexible Scheduling:**  
-  Schedule tasks using either native MON (by sending ETH along with the call) or bonded shMONAD.
+  Schedule tasks using either native MON (by sending native value along with the call) or bonded shMONAD.
 
 - **Execution Isolation:**  
   Each task is executed in a dedicated execution environment deployed via CREATE2. Two environments are available:

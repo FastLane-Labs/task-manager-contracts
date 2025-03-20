@@ -9,7 +9,7 @@
   evm_version = "cancun"
   via_ir = true
   isolate = false
-  gas_reports = ["Atlas", "AtlasVerification", "Simulator", "Sorter", "ExecutionEnvironment"]
+  gas_reports = []
   fs_permissions = [{ access = "read-write", path = "./"}]
   json = true
 
@@ -29,7 +29,7 @@
   ignore = ["./**/*.t.sol", "src/core/Storage.sol"]
 
 [rpc_endpoints]
-  monadTestnet = "${ETH_HOLESKY_RPC_URL}"
+  monadTestnet = "${MONAD_TESTNET_RPC_URL}"
 
 [etherscan]
 
