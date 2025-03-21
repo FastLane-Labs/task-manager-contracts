@@ -11,7 +11,6 @@ import { TaskManagerEntrypoint } from "../../../src/core/Entrypoint.sol";
 import { IShMonad } from "../../../src/interfaces/shmonad/IShMonad.sol";
 import { IAddressHub } from "../../../src/interfaces/common/IAddressHub.sol";
 import { Directory } from "../../../src/interfaces/common/Directory.sol";
-import { console } from "forge-std/console.sol";
 contract SetupTaskManager is Test {
     using UpgradeUtils for VmSafe;
 

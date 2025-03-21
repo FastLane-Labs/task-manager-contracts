@@ -233,7 +233,7 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
     {
         // Validate payout address is not zero
         if (payoutAddress == address(0)) {
-            revert InvalidPayoutAddress();
+            revert InvalidPayoutAddress(payoutAddress);
         }
 
         // Loop through available tasks
