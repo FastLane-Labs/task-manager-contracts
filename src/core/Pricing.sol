@@ -26,6 +26,8 @@ import { TaskAccountingMath } from "../libraries/TaskAccountingMath.sol";
 ///
 /// TODO: Consider moving pricing logic to a dedicated pricing module
 abstract contract TaskPricing is TaskLoadBalancer {
+    using Math for uint256;
+
     /// @notice Constructor to set immutable variables
     /// @param shMonad The address of the shMonad contract
     /// @param policyId The policy ID for the task manager
