@@ -8,6 +8,7 @@ import { IShMonad } from "src/interfaces/shmonad/IShMonad.sol";
 import { Directory } from "src/interfaces/common/Directory.sol";
 import { TaskAccountingMath } from "../libraries/TaskAccountingMath.sol";
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 
 /// @title TaskExecutor
 /// @notice Handles task execution and fee distribution
@@ -31,6 +32,7 @@ import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 /// TODO: Add support for partial fee refunds on task failure
 abstract contract TaskExecutor is TaskPricing {
     using TaskBits for bytes32;
+    using Math for uint256;
 
     constructor(address shMonad, uint64 policyId) TaskPricing(shMonad, policyId) { }
 
@@ -217,10 +219,17 @@ abstract contract TaskExecutor is TaskPricing {
     /// @param executor Address of the task executor
     /// @param payout Total amount to distribute
     function _handleExecutionFees(address executor, uint256 payout) internal {
-        // Calculate fee splits
-        uint256 protocolPayout = (payout * TaskAccountingMath.PROTOCOL_FEE_BPS) / TaskAccountingMath.BPS_SCALE;
-        uint256 validatorPayout = (payout * TaskAccountingMath.VALIDATOR_FEE_BPS) / TaskAccountingMath.BPS_SCALE;
-        uint256 executorPayout = payout - protocolPayout - validatorPayout;
+        // convert payout to shares
+        uint256 payoutInShares = IShMonad(SHMONAD).previewWithdraw(payout);
+        // Calculate fee splits using Math.mulDiv with explicit Floor rounding mode to ensure we don't exceed available
+        // funds
+        uint256 protocolPayout = Math.mulDiv(
+            payoutInShares, TaskAccountingMath.PROTOCOL_FEE_BPS, TaskAccountingMath.BPS_SCALE, Math.Rounding.Floor
+        );
+        uint256 validatorPayout = Math.mulDiv(
+            payoutInShares, TaskAccountingMath.VALIDATOR_FEE_BPS, TaskAccountingMath.BPS_SCALE, Math.Rounding.Floor
+        );
+        uint256 executorPayout = payoutInShares - protocolPayout - validatorPayout;
         bool success;
         // First distribute validator payout
         if (block.coinbase != address(0)) {
