@@ -250,12 +250,22 @@ abstract contract TaskExecutor is TaskPricing {
         }
         emit ExecutorReimbursed(executor, executorPayout);
 
-        // Then boost yield with protocol fee instead
-        (success,) =
-            SHMONAD.call{ gas: gasleft() }(abi.encodeWithSelector(bytes4(0x2eac4115), protocolPayout, address(this)));
-        if (!success) {
-            revert BoostYieldFailed(address(this), protocolPayout);
+        // Check current balance before boost yield call
+        uint256 currentBalance = IERC20(address(SHMONAD)).balanceOf(address(this));
+        
+        // If we have less balance than expected for protocol payout, use what we have
+        if (currentBalance < protocolPayout) {
+            protocolPayout = currentBalance;
         }
-        emit ProtocolFeeCollected(protocolPayout);
+        
+        // Only proceed with boost yield if we have a non-zero amount
+        if (protocolPayout > 0) {
+            (success,) =
+                SHMONAD.call{ gas: gasleft() }(abi.encodeWithSelector(bytes4(0x2eac4115), protocolPayout, address(this)));
+            if (!success) {
+                revert BoostYieldFailed(address(this), protocolPayout);
+            }
+            emit ProtocolFeeCollected(protocolPayout);
+        }
     }
 }
