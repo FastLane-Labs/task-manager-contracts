@@ -163,7 +163,7 @@ contract TaskManagerEntrypointTest is TaskManagerTestHelper {
         uint64 currentBlock = uint64(block.number);
         
         // Create task using helper function
-        Task memory task = _createTask(user, 1, Size.Small);
+        _createTask(user, 1, Size.Small);
         
         // Schedule task for block 102 (must be at least 2 blocks in the future)
         uint64 targetBlock = uint64(currentBlock + 2);
@@ -317,12 +317,6 @@ contract TaskManagerEntrypointTest is TaskManagerTestHelper {
         
         // Get current block and use relative offsets
         uint64 currentBlock = uint64(block.number);
-
-        // Create tasks of different sizes
-        Task memory smallTask1 = _createTask(user, 1, Size.Small);
-        Task memory smallTask2 = _createTask(user, 2, Size.Small);
-        Task memory mediumTask = _createTask(user, 3, Size.Medium);
-        Task memory largeTask = _createTask(user, 4, Size.Large);
 
         // Target blocks for tasks - use relative offsets
         uint64 block2 = currentBlock + 2;  // +2 blocks from current
@@ -605,7 +599,6 @@ contract TaskManagerEntrypointTest is TaskManagerTestHelper {
         // Dense region: Schedule tasks in consecutive 4-block chunks
         // This tests C-level bitmap iteration
         for (uint256 i = 0; i < 5; i++) {
-            Task memory task = _createTask(user, uint64(i + 1), Size.Small);
             uint64 targetBlock = startBlock + 4 * uint64(i) + 2; // Tasks at blocks +2, +6, +10, +14, +18
             taskIds[i] = _scheduleTask(user, uint64(i + 1), Size.Small, targetBlock);
         }
@@ -613,7 +606,6 @@ contract TaskManagerEntrypointTest is TaskManagerTestHelper {
         // Sparse region: Schedule tasks with large gaps
         // This tests D-level bitmap iteration
         for (uint i = 0; i < 5; i++) {
-            Task memory task = _createTask(user, uint64(i + 6), Size.Small);
             uint64 targetBlock = startBlock + 200 + 130 * uint64(i); // Tasks with 130-block gaps
             taskIds[i + 5] = _scheduleTask(user, uint64(i + 6), Size.Small, targetBlock);
         }
@@ -622,15 +614,10 @@ contract TaskManagerEntrypointTest is TaskManagerTestHelper {
         uint64 execBlock = startBlock + 1000;
         vm.roll(execBlock);
 
-        // Get initial load balancer state
-        (uint64 initialBlockSmall,,,,) = taskManager.S_loadBalancer();
-
         // Execute tasks
         uint256 feesEarned = taskManager.executeTasks(payout, 0);
         assertTrue(feesEarned > 0, "Should earn fees from execution");
 
-        // Get final load balancer state
-        (uint64 finalBlockSmall,,,,) = taskManager.S_loadBalancer();
 
         // Verify all tasks were executed
         for (uint i = 0; i < taskIds.length; i++) {
@@ -660,7 +647,7 @@ contract TaskManagerEntrypointTest is TaskManagerTestHelper {
         vm.roll(targetBlock + 1);
 
         // Get initial load balancer state
-        (uint64 initialBlockMedium,, uint64 initialBlockSmall,,) = taskManager.S_loadBalancer();
+        (uint64 initialBlockMedium,,,,) = taskManager.S_loadBalancer();
 
         // Execute tasks
         uint256 feesEarned = taskManager.executeTasks(payout, 0);

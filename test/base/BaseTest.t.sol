@@ -68,10 +68,10 @@ contract BaseTest is
         isMonad = true;
     }
 
-    function _setupAddressHub(address deployer) internal virtual {
+    function _setupAddressHub(address _deployer) internal virtual {
         addressHub = IAddressHub(ADDRESS_HUB);
         // Add the deployer as an owner of the AddressHub
         vm.prank(ADDRESS_HUB_OWNER);
-        addressHub.addOwner(deployer);
+        addressHub.addOwner(_deployer);
     }
 }
