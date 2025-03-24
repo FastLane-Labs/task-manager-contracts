@@ -189,7 +189,8 @@ abstract contract TaskExecutor is TaskPricing {
 
             // Mark task complete using the net fee value
             trackers = _markTaskComplete(trackers, _thisIterationPayoutUnadj);
-            feesEarned += (_thisIterationPayoutUnadj * _FEE_SIG_FIG);
+            // subtract 1 to account for rounding
+            feesEarned += (_thisIterationPayoutUnadj * _FEE_SIG_FIG) - 1;
         }
 
         return (trackers, feesEarned);
@@ -219,19 +220,21 @@ abstract contract TaskExecutor is TaskPricing {
     /// @param executor Address of the task executor
     /// @param payout Total amount to distribute
     function _handleExecutionFees(address executor, uint256 payout) internal {
-        // convert payout to shares
-        uint256 payoutInShares = IShMonad(SHMONAD).previewWithdraw(payout);
-        // Calculate fee splits using Math.mulDiv with explicit Floor rounding mode to ensure we don't exceed available
-        // funds
-        uint256 protocolPayout = Math.mulDiv(
-            payoutInShares, TaskAccountingMath.PROTOCOL_FEE_BPS, TaskAccountingMath.BPS_SCALE, Math.Rounding.Floor
-        );
+        // Convert payout to shares
+        uint256 payoutInShares = _convertMonToShMon(payout);
+
         uint256 validatorPayout = Math.mulDiv(
             payoutInShares, TaskAccountingMath.VALIDATOR_FEE_BPS, TaskAccountingMath.BPS_SCALE, Math.Rounding.Floor
         );
-        uint256 executorPayout = payoutInShares - protocolPayout - validatorPayout;
-        bool success;
+
+        uint256 protocolPayout = Math.mulDiv(
+            payoutInShares, TaskAccountingMath.PROTOCOL_FEE_BPS, TaskAccountingMath.BPS_SCALE, Math.Rounding.Floor
+        );
+
+        uint256 executorPayout = payoutInShares - validatorPayout - protocolPayout;
+
         // First distribute validator payout
+        bool success;
         if (block.coinbase != address(0)) {
             (success,) =
                 SHMONAD.call{ gas: gasleft() }(abi.encodeCall(IERC20.transfer, (block.coinbase, validatorPayout)));
@@ -239,7 +242,7 @@ abstract contract TaskExecutor is TaskPricing {
                 revert ValidatorReimbursementFailed(block.coinbase, validatorPayout);
             }
         } else {
-            // testnet validator is not set, so we add it to the protocol payout
+            // Add validator payout to protocol payout if coinbase is not set
             protocolPayout += validatorPayout;
         }
 
@@ -250,22 +253,12 @@ abstract contract TaskExecutor is TaskPricing {
         }
         emit ExecutorReimbursed(executor, executorPayout);
 
-        // Check current balance before boost yield call
-        uint256 currentBalance = IERC20(address(SHMONAD)).balanceOf(address(this));
-        
-        // If we have less balance than expected for protocol payout, use what we have
-        if (currentBalance < protocolPayout) {
-            protocolPayout = currentBalance;
+        // Then boost yield with protocol fee instead
+        (success,) =
+            SHMONAD.call{ gas: gasleft() }(abi.encodeWithSelector(bytes4(0x2eac4115), protocolPayout, address(this)));
+        if (!success) {
+            revert BoostYieldFailed(address(this), protocolPayout);
         }
-        
-        // Only proceed with boost yield if we have a non-zero amount
-        if (protocolPayout > 0) {
-            (success,) =
-                SHMONAD.call{ gas: gasleft() }(abi.encodeWithSelector(bytes4(0x2eac4115), protocolPayout, address(this)));
-            if (!success) {
-                revert BoostYieldFailed(address(this), protocolPayout);
-            }
-            emit ProtocolFeeCollected(protocolPayout);
-        }
+        emit ProtocolFeeCollected(protocolPayout);
     }
 }

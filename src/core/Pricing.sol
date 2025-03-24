@@ -5,6 +5,7 @@ import { TaskMetadata, Size, Depth, LoadBalancer, Tracker, Trackers } from "../t
 import { TaskLoadBalancer } from "./LoadBalancer.sol";
 import { IShMonad } from "src/interfaces/shmonad/IShMonad.sol";
 import { TaskAccountingMath } from "../libraries/TaskAccountingMath.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 
 /// @title TaskPricing
 /// @notice Handles fee calculations and pricing for task execution
@@ -26,8 +27,6 @@ import { TaskAccountingMath } from "../libraries/TaskAccountingMath.sol";
 ///
 /// TODO: Consider moving pricing logic to a dedicated pricing module
 abstract contract TaskPricing is TaskLoadBalancer {
-    using Math for uint256;
-
     /// @notice Constructor to set immutable variables
     /// @param shMonad The address of the shMonad contract
     /// @param policyId The policy ID for the task manager
@@ -49,8 +48,8 @@ abstract contract TaskPricing is TaskLoadBalancer {
     /// @param trackers Current execution metrics at all levels
     /// @return payout trackers and calculated payout amount
     function _getReimbursementAmount(Trackers memory trackers) internal pure returns (uint256 payout) {
-        // Get average unpaid fees
-        (uint256 _avgFeeB, uint256 _avgFeeC, uint256 _avgFeeD) = _getAverageUnpaidFees(trackers);
+        // Get average unpaid fees rounded down
+        (uint256 _avgFeeB, uint256 _avgFeeC, uint256 _avgFeeD) = _getAverageUnpaidFees(trackers, Math.Rounding.Floor);
         uint256 _incompleteTasksB = uint256(trackers.b.totalTasks) - uint256(trackers.b.executedTasks);
 
         if (_incompleteTasksB > 1) {
@@ -82,37 +81,46 @@ abstract contract TaskPricing is TaskLoadBalancer {
         // Get base fee from gas limit for this task size if we have no fees collected
         uint256 _baseFee = uint256(_MIN_FEE_RATE * _maxGasFromSize(trackers.size));
 
-        // Get average unpaid fees
-        (uint256 _avgFeeB, uint256 _avgFeeC, uint256 _avgFeeD) = _getAverageUnpaidFees(trackers);
+        // Get average unpaid fees rounded up
+        (uint256 _avgFeeB, uint256 _avgFeeC, uint256 _avgFeeD) = _getAverageUnpaidFees(trackers, Math.Rounding.Ceil);
 
         // Adjust avg fee if they're below the base fee
         if (_avgFeeB < _baseFee) _avgFeeB = _baseFee;
         if (_avgFeeC < _baseFee) _avgFeeC = _baseFee;
         if (_avgFeeD < _baseFee) _avgFeeD = _baseFee;
 
-        // get the weighted average
-        executionQuote = ((_avgFeeB * _B_MOD) + (_avgFeeC * _C_MOD) + (_avgFeeD * _D_MOD)) / _MOD_BASE;
+        // Get the weighted average with ceiling rounding for quotes rounded up
+        uint256 weightedB = Math.mulDiv(_avgFeeB, _B_MOD, _MOD_BASE, Math.Rounding.Ceil);
+        uint256 weightedC = Math.mulDiv(_avgFeeC, _C_MOD, _MOD_BASE, Math.Rounding.Ceil);
+        uint256 weightedD = Math.mulDiv(_avgFeeD, _D_MOD, _MOD_BASE, Math.Rounding.Ceil);
+        executionQuote = weightedB + weightedC + weightedD;
         // This can be _BASE_RATE * GAS at the lowest
 
-        // add the congestion modifier
-        executionQuote = executionQuote * _CONGESTION_GROWTH_RATE / _BASE_RATE;
+        // Add the congestion modifier with ceiling rounding
+        executionQuote = Math.mulDiv(executionQuote, _CONGESTION_GROWTH_RATE, _BASE_RATE, Math.Rounding.Ceil);
 
-        // add the forecast modifier
+        // Add the forecast modifier with ceiling rounding
         uint256 _forecastModifier = (trackers.blockNumber - block.number) / _GROUP_SIZE;
-        executionQuote = executionQuote * (_BASE_RATE + (_FORECAST_GROWTH_RATE * _forecastModifier)) / _BASE_RATE;
+        uint256 forecastRate = Math.mulDiv(
+            _BASE_RATE + (_FORECAST_GROWTH_RATE * _forecastModifier), _BASE_RATE, _BASE_RATE, Math.Rounding.Ceil
+        );
+        executionQuote = Math.mulDiv(executionQuote, forecastRate, _BASE_RATE, Math.Rounding.Ceil);
 
-        // handle the significant figures / rounding
-        return executionQuote + 1;
+        return executionQuote;
     }
 
     /// @notice Generates average fees for incomplete tasks for the different task groupings
     /// @dev Uses weighted average of fees across periods
     /// NOTE: This is not adjusted for _FEE_SIG_FIG
     /// @param trackers Metrics for target block and size
+    /// @param rounding The rounding mode for the calculation
     /// @return avgFeeB Average unpaid fee per task of B grouping
     /// @return avgFeeC Average unpaid fee per task of C grouping
     /// @return avgFeeD Average unpaid fee per task of D grouping
-    function _getAverageUnpaidFees(Trackers memory trackers)
+    function _getAverageUnpaidFees(
+        Trackers memory trackers,
+        Math.Rounding rounding
+    )
         internal
         pure
         returns (uint256 avgFeeB, uint256 avgFeeC, uint256 avgFeeD)
@@ -134,8 +142,24 @@ abstract contract TaskPricing is TaskLoadBalancer {
             ? 0
             : uint256(trackers.d.cumulativeFeesCollected) - uint256(trackers.d.cumulativeFeesPaid);
 
-        avgFeeB = _incompleteTasksB == 0 ? 0 : _unpaidFeesB / _incompleteTasksB;
-        avgFeeC = _incompleteTasksC == 0 ? 0 : _unpaidFeesC / _incompleteTasksC;
-        avgFeeD = _incompleteTasksD == 0 ? 0 : _unpaidFeesD / _incompleteTasksD;
+        // Calculate average fees for each tracker, using base fee as fallback when no fees collected rounded down on
+        // payouts and rounded up on quotes
+        avgFeeB = _incompleteTasksB == 0 ? 0 : Math.mulDiv(_unpaidFeesB, 1, _incompleteTasksB, rounding);
+        avgFeeC = _incompleteTasksC == 0 ? 0 : Math.mulDiv(_unpaidFeesC, 1, _incompleteTasksC, rounding);
+        avgFeeD = _incompleteTasksD == 0 ? 0 : Math.mulDiv(_unpaidFeesD, 1, _incompleteTasksD, rounding);
+    }
+
+    /// @notice Converts a given amount of Mon to ShMon
+    /// @param amount The amount of Mon to convert
+    /// @return shares The amount of ShMon equivalent to the input amount
+    function _convertMonToShMon(uint256 amount) internal view returns (uint256 shares) {
+        shares = IShMonad(SHMONAD).convertToShares(amount);
+    }
+
+    /// @notice Converts a given amount of ShMon to Mon
+    /// @param shares The amount of ShMon to convert
+    /// @return amount The amount of Mon equivalent to the input amount
+    function _convertShMonToMon(uint256 shares) internal view returns (uint256 amount) {
+        amount = IShMonad(SHMONAD).convertToAssets(shares);
     }
 }
