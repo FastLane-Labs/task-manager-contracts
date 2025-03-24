@@ -9,6 +9,7 @@ import { TaskScheduler } from "./Scheduler.sol";
 import { TaskBits } from "../libraries/TaskBits.sol";
 import { TaskStorage } from "./Storage.sol";
 import { OwnableUpgradeable } from "openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 
 /// @title TaskManagerEntrypoint
 /// @notice Public interface for task management
@@ -65,7 +66,8 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
         (Trackers memory _trackers, uint256 _executionCostUnadj) = _getTaskQuote(_taskMetaData.size, targetBlock);
 
         // Adjust for _FEE_SIG_FIG and revert if cost exceeds max payment
-        executionCost = _executionCostUnadj * _FEE_SIG_FIG;
+        // Use Math.mulDiv with Rounding.Ceil to always round up quotes, ensuring sufficient fees are collected
+        executionCost = Math.mulDiv(_executionCostUnadj, _FEE_SIG_FIG, 1, Math.Rounding.Ceil);
         if (executionCost > maxPayment) revert TaskCostAboveMax(executionCost, maxPayment);
 
         // Handle payment
@@ -194,7 +196,7 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
         (, uint256 _executionCostUnadj) = _getTaskQuote(_size, targetBlock);
 
         // Adjust for _FEE_SIG_FIG and revert if cost exceeds max payment
-        executionCost = _executionCostUnadj * _FEE_SIG_FIG;
+        executionCost = Math.mulDiv(_executionCostUnadj, _FEE_SIG_FIG, 1, Math.Rounding.Ceil);
         if (executionCost > maxPayment) revert TaskCostAboveMax(executionCost, maxPayment);
 
         // Load the metadata
@@ -291,7 +293,7 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
         (, uint256 _costUnadj) = _getTaskQuote(_size, targetBlock);
 
         // Convert for sig fig
-        cost = _costUnadj * _FEE_SIG_FIG;
+        cost = Math.mulDiv(_costUnadj, _FEE_SIG_FIG, 1, Math.Rounding.Ceil);
     }
 
     /// @inheritdoc ITaskManager
