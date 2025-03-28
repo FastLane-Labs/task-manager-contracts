@@ -680,7 +680,6 @@ contract TaskManagerEntrypointTest is TaskManagerTestHelper {
         // Create and schedule 5 tasks for the same block
         bytes32[] memory taskIds = new bytes32[](5);
         for (uint256 i = 0; i < 5; i++) {
-            Task memory task = _createTask(user, uint64(i + 1), Size.Small);
             taskIds[i] = _scheduleTask(user, uint64(i + 1), Size.Small, targetBlock);
         }
 

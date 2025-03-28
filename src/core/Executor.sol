@@ -38,7 +38,7 @@ abstract contract TaskExecutor is TaskPricing {
     // @dev Schedule a task with size determination and tracking updates
     function _checkRescheduleTask(Trackers memory trackers) internal returns (Trackers memory) {
         bytes32 _taskId = T_currentTaskId;
-        (address _environment, uint64 _targetBlock, uint16 _initIndex, Size _size,) = _taskId.unpack();
+        (, uint64 _targetBlock, uint16 _initIndex, Size _size,) = _taskId.unpack();
 
         if (_targetBlock <= block.number) return trackers;
 

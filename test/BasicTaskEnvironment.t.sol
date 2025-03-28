@@ -87,16 +87,7 @@ contract BasicTaskEnvironmentTest is TaskManagerTestHelper {
     
     function test_ScheduleWithInvalidTarget() public {
         vm.startPrank(user);
-        
-        // Layer 1: Encode the actual function call
-        bytes memory targetCalldata = abi.encodeCall(MockTarget.setValue, (42));
-        
-        // Layer 2: Pack target and calldata with zero address
-        bytes memory packedData = abi.encode(address(0), targetCalldata);
-        
-        // Layer 3: Encode the executeTask call
-        bytes memory taskData = abi.encodeWithSelector(EXECUTE_TASK_SELECTOR, packedData);
-        
+
         // Schedule task for next block
         uint64 targetBlock = uint64(block.number + 2);
         bytes32 taskId = _scheduleTask(user, 0, Size.Small, targetBlock);
@@ -117,12 +108,6 @@ contract BasicTaskEnvironmentTest is TaskManagerTestHelper {
     
     function test_ScheduleWithEmptyCalldata() public {
         vm.startPrank(user);
-
-        // Layer 2: Pack target with empty calldata
-        bytes memory packedData = abi.encode(address(mockTarget), "");
-
-        // Layer 3: Encode the executeTask call
-        bytes memory taskData = abi.encodeWithSelector(EXECUTE_TASK_SELECTOR, packedData);
 
         // Schedule task for next block
         uint64 targetBlock = uint64(block.number + 2);
