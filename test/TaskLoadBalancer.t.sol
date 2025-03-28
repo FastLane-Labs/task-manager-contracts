@@ -186,7 +186,7 @@ contract TaskLoadBalancerTest is TaskLoadBalancer, Test {
         uint256 initialGas = gasleft();
 
         // Try to allocate load
-        (LoadBalancerType memory loadBalancer, Size size, uint64 blockNumber, bool tasksAvailable) = _allocateLoad(initialGas);
+        (, Size size, uint64 blockNumber, bool tasksAvailable) = _allocateLoad(initialGas);
         
         // Should not allocate any task due to low gas
         assertFalse(tasksAvailable, "Tasks should not be available with low gas");
