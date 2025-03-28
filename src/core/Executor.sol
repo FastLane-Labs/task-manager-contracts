@@ -32,14 +32,13 @@ import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 /// TODO: Add support for partial fee refunds on task failure
 abstract contract TaskExecutor is TaskPricing {
     using TaskBits for bytes32;
-    using Math for uint256;
 
     constructor(address shMonad, uint64 policyId) TaskPricing(shMonad, policyId) { }
 
     // @dev Schedule a task with size determination and tracking updates
     function _checkRescheduleTask(Trackers memory trackers) internal returns (Trackers memory) {
         bytes32 _taskId = T_currentTaskId;
-        (, uint64 _targetBlock, uint16 _initIndex, Size _size,) = _taskId.unpack();
+        (address _environment, uint64 _targetBlock, uint16 _initIndex, Size _size,) = _taskId.unpack();
 
         if (_targetBlock <= block.number) return trackers;
 
@@ -82,8 +81,8 @@ abstract contract TaskExecutor is TaskPricing {
     ///
     /// @param payoutAddress Address to receive execution fees
     /// @param targetGasReserve Gas to reserve for post-execution operations
-    /// @return feesEarned Total fees earned from task execution
-    function _execute(address payoutAddress, uint256 targetGasReserve) internal returns (uint256 feesEarned) {
+    /// @return feesSharesEarned Total fees earned from task execution in shares
+    function _execute(address payoutAddress, uint256 targetGasReserve) internal returns (uint256 feesSharesEarned) {
         // Return early if there is not enough gas available
         // We need:
         // - SMALL_GAS for task execution
@@ -103,7 +102,7 @@ abstract contract TaskExecutor is TaskPricing {
             // Run the current queue and accumulate fees
             uint256 feesFromThisQueue;
             (_trackers, feesFromThisQueue) = _runQueue(_trackers, _minLeftoverGas);
-            feesEarned += feesFromThisQueue;
+            feesSharesEarned += feesFromThisQueue;
 
             if (_trackers.updateAllTrackers) {
                 _trackers.updateAllTrackers = false;
@@ -120,8 +119,8 @@ abstract contract TaskExecutor is TaskPricing {
         } while (gasleft() > _minLeftoverGas);
 
         // Handle payouts if we earned any fees
-        if (feesEarned > 0) {
-            _handleExecutionFees(payoutAddress, feesEarned);
+        if (feesSharesEarned > 0) {
+            _handleExecutionFees(payoutAddress, feesSharesEarned);
         }
 
         // Store final state
@@ -133,7 +132,7 @@ abstract contract TaskExecutor is TaskPricing {
             _storeLoadBalancer(_trackers);
         }
 
-        return feesEarned;
+        return feesSharesEarned;
     }
 
     /// @notice Processes tasks in the current queue until gas runs low or no tasks remain
@@ -189,8 +188,8 @@ abstract contract TaskExecutor is TaskPricing {
 
             // Mark task complete using the net fee value
             trackers = _markTaskComplete(trackers, _thisIterationPayoutUnadj);
-            // subtract 1 to account for rounding
-            feesEarned += (_thisIterationPayoutUnadj * _FEE_SIG_FIG) - 1;
+            // Subtract 1 to account for rounding error
+            feesEarned += (_thisIterationPayoutUnadj * _FEE_SIG_FIG);
         }
 
         return (trackers, feesEarned);
@@ -218,11 +217,8 @@ abstract contract TaskExecutor is TaskPricing {
     /// @notice Handles distribution of execution fees and bond accounting
     /// @dev Splits fees between executor and protocol, updates bond balances
     /// @param executor Address of the task executor
-    /// @param payout Total amount to distribute
-    function _handleExecutionFees(address executor, uint256 payout) internal {
-        // Convert payout to shares
-        uint256 payoutInShares = _convertMonToShMon(payout);
-
+    /// @param payoutInShares Total amount to distribute in shares
+    function _handleExecutionFees(address executor, uint256 payoutInShares) internal {
         uint256 validatorPayout = Math.mulDiv(
             payoutInShares, TaskAccountingMath.VALIDATOR_FEE_BPS, TaskAccountingMath.BPS_SCALE, Math.Rounding.Floor
         );

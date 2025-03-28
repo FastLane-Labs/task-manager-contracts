@@ -55,9 +55,10 @@ contract BaseTest is
 
         shMonad = IShMonad(addressHub.getAddressFromPointer(Directory._SHMONAD));
 
-        SetupTaskManager.__deployProxyTaskManager(deployer, addressHub);
+        address _deployer = TESTNET_FASTLANE_DEPLOYER;
+        address _proxyAdmin = TESTNET_TASK_MANAGER_PROXY_ADMIN;
         // Upgrade implementations to the latest version
-        SetupTaskManager.__setUpTaskManager(deployer, addressHub);
+        SetupTaskManager.__setUpTaskManager(_deployer, _proxyAdmin, addressHub);
     }
 
     // Virtual function to configure network - can be overridden by test contracts

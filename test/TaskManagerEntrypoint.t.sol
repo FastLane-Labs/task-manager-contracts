@@ -669,4 +669,31 @@ contract TaskManagerEntrypointTest is TaskManagerTestHelper {
 
         vm.stopPrank();
     }
+
+    function testMultipleTasksSameBlock() public {
+        vm.startPrank(user);
+
+        // Set target block (current block + 10 for safety)
+        uint64 targetBlock = uint64(block.number) + 10;
+        vm.roll(targetBlock - 1); // Roll to block before execution
+
+        // Create and schedule 5 tasks for the same block
+        bytes32[] memory taskIds = new bytes32[](5);
+        for (uint256 i = 0; i < 5; i++) {
+            Task memory task = _createTask(user, uint64(i + 1), Size.Small);
+            taskIds[i] = _scheduleTask(user, uint64(i + 1), Size.Small, targetBlock);
+        }
+
+        // Execute at target block
+        vm.roll(targetBlock+1);
+        uint256 feesEarned = taskManager.executeTasks(payout, 0);
+        assertTrue(feesEarned > 0, "Should earn fees from execution");
+
+        // Verify all tasks executed
+        for (uint i = 0; i < taskIds.length; i++) {
+            assertTrue(taskManager.isTaskExecuted(taskIds[i]), string.concat("Task ", vm.toString(i), " should be executed"));
+        }
+
+        vm.stopPrank();
+    }
 } 
