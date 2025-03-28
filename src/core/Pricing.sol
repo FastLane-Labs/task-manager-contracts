@@ -149,17 +149,11 @@ abstract contract TaskPricing is TaskLoadBalancer {
         avgFeeD = _incompleteTasksD == 0 ? 0 : Math.mulDiv(_unpaidFeesD, 1, _incompleteTasksD, rounding);
     }
 
-    /// @notice Converts a given amount of Mon to ShMon
-    /// @param amount The amount of Mon to convert
-    /// @return shares The amount of ShMon equivalent to the input amount
     function _convertMonToShMon(uint256 amount) internal view returns (uint256 shares) {
-        shares = IShMonad(SHMONAD).convertToShares(amount);
+        shares = IShMonad(SHMONAD).previewDeposit(amount);
     }
 
-    /// @notice Converts a given amount of ShMon to Mon
-    /// @param shares The amount of ShMon to convert
-    /// @return amount The amount of Mon equivalent to the input amount
     function _convertShMonToMon(uint256 shares) internal view returns (uint256 amount) {
-        amount = IShMonad(SHMONAD).convertToAssets(shares);
+        amount = IShMonad(SHMONAD).previewMint(shares);
     }
 }

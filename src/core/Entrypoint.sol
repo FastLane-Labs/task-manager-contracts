@@ -25,7 +25,7 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
 
     /// @notice Initialize the contract
     /// @param deployer The deployer of the contract
-    function initialize(address deployer) public reinitializer(1) {
+    function initialize(address deployer) public reinitializer(2) {
         __Ownable_init(deployer);
 
         // Initialize LoadBalancer with current block number
@@ -65,16 +65,17 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
         // Get quote for task
         (Trackers memory _trackers, uint256 _executionCostUnadj) = _getTaskQuote(_taskMetaData.size, targetBlock);
 
-        // Adjust for _FEE_SIG_FIG and revert if cost exceeds max payment
-        // Use Math.mulDiv with Rounding.Ceil to always round up quotes, ensuring sufficient fees are collected
-        executionCost = Math.mulDiv(_executionCostUnadj, _FEE_SIG_FIG, 1, Math.Rounding.Ceil);
+        // Adjust for _FEE_SIG_FIG
+        uint256 executionCostInShMon = _executionCostUnadj * _FEE_SIG_FIG;
+        // Convert the cost to MON and revert if it exceeds max payment
+        executionCost = _convertShMonToMon(executionCostInShMon);
         if (executionCost > maxPayment) revert TaskCostAboveMax(executionCost, maxPayment);
 
         // Handle payment
         if (payWithMON) {
             _takeMonad(_taskMetaData.owner, executionCost);
         } else {
-            _takeBondedShmonad(_taskMetaData.owner, executionCost);
+            _takeBondedShmonad(_taskMetaData.owner, executionCostInShMon);
         }
 
         // Deploy the execution environment
@@ -196,7 +197,7 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
         (, uint256 _executionCostUnadj) = _getTaskQuote(_size, targetBlock);
 
         // Adjust for _FEE_SIG_FIG and revert if cost exceeds max payment
-        executionCost = Math.mulDiv(_executionCostUnadj, _FEE_SIG_FIG, 1, Math.Rounding.Ceil);
+        executionCost = _executionCostUnadj * _FEE_SIG_FIG;
         if (executionCost > maxPayment) revert TaskCostAboveMax(executionCost, maxPayment);
 
         // Load the metadata
@@ -293,7 +294,10 @@ contract TaskManagerEntrypoint is TaskScheduler, ITaskManager, OwnableUpgradeabl
         (, uint256 _costUnadj) = _getTaskQuote(_size, targetBlock);
 
         // Convert for sig fig
-        cost = Math.mulDiv(_costUnadj, _FEE_SIG_FIG, 1, Math.Rounding.Ceil);
+        cost = _costUnadj * _FEE_SIG_FIG;
+
+        // Convert to MON and add 1 to account for rounding on shMonad
+        cost = _convertShMonToMon(cost);
     }
 
     /// @inheritdoc ITaskManager

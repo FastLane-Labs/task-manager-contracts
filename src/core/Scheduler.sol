@@ -150,7 +150,7 @@ abstract contract TaskScheduler is TaskExecutor, TaskFactory, NoncesUpgradeable 
         }
         // Deposit the MON to get shMON
         (bool _success, bytes memory _returnData) =
-            SHMONAD.call{ gas: gasleft(), value: amount }(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+            SHMONAD.call{ value: amount }(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
         if (!_success) {
             assembly {
                 revert(add(_returnData, 32), mload(_returnData))
@@ -164,12 +164,12 @@ abstract contract TaskScheduler is TaskExecutor, TaskFactory, NoncesUpgradeable 
 
     /// @notice Take bonded shMONAD from user, transfer it to task manager, and convert to unbonded form
     /// @param from The address to take bonded tokens from
-    /// @param amount The amount of tokens to take and unbond
+    /// @param shMonAmount The amount of tokens to take and unbond
     /// @dev First transfers bonded tokens to task manager, then unbonds them to be used for task payment
-    function _takeBondedShmonad(address from, uint256 amount) internal {
+    function _takeBondedShmonad(address from, uint256 shMonAmount) internal {
         // Withdraw the tokens from the bonded policy and give them unbonded to the task manager
         (bool _success, bytes memory _returnData) = SHMONAD.call{ gas: gasleft() }(
-            abi.encodeCall(IShMonad.agentTransferToUnbonded, (POLICY_ID, from, address(this), amount, 0, true))
+            abi.encodeCall(IShMonad.agentTransferToUnbonded, (POLICY_ID, from, address(this), shMonAmount, 0, false))
         );
         if (!_success) {
             assembly {
